@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Image Squeezer — 10MB以下に画像を圧縮</title>
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="favicon-192.png">
+<link rel="apple-touch-icon" href="favicon-192.png">
+<style>
+  :root {
+    --bg: #0b0d12;
+    --panel: #151823;
+    --panel-2: #1d2030;
+    --border: #2a2f42;
+    --text: #e6e9f2;
+    --text-dim: #8a91a8;
+    --accent: #7c5cff;
+    --accent-2: #00d4b8;
+    --danger: #ff5577;
+    --warn: #ffb347;
+    --ok: #4ade80;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: radial-gradient(1200px 600px at 80% -10%, rgba(124,92,255,.18), transparent 60%),
+                radial-gradient(900px 500px at -10% 110%, rgba(0,212,184,.12), transparent 60%),
+                var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif;
+    min-height: 100vh;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 28px 20px 80px; }
+  header { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; }
+  .logo {
+    width: 44px; height: 44px; border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 8px 24px rgba(124,92,255,.35);
+    flex-shrink: 0;
+  }
+  .logo img {
+    width: 100%; height: 100%;
+    display: block;
+    object-fit: cover;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+  h1 { font-size: 22px; margin: 0; letter-spacing: .2px; }
+  .sub { color: var(--text-dim); font-size: 13px; margin-top: 2px; }
+
+  .drop {
+    display: block;
+    border: 2px dashed var(--border);
+    background: linear-gradient(180deg, var(--panel), var(--panel-2));
+    border-radius: 18px; padding: 36px; text-align: center;
+    transition: all .15s ease;
+    cursor: pointer;
+  }
+  .drop.hover { border-color: var(--accent); background: linear-gradient(180deg, rgba(124,92,255,.10), rgba(124,92,255,.04)); }
+  .drop p { margin: 6px 0; }
+  .drop .big { font-size: 17px; }
+  .drop .small { color: var(--text-dim); font-size: 13px; }
+  .drop input { display: none; }
+  .btn {
+    appearance: none; border: 0; cursor: pointer;
+    background: linear-gradient(135deg, var(--accent), #5a3eff);
+    color: white; font-weight: 600; padding: 10px 16px; border-radius: 10px;
+    font-size: 14px; letter-spacing: .2px;
+    box-shadow: 0 6px 18px rgba(124,92,255,.35);
+  }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn.ghost {
+    background: transparent; color: var(--text);
+    border: 1px solid var(--border); box-shadow: none;
+  }
+  .btn.ok {
+    background: linear-gradient(135deg, var(--accent-2), #00a08a);
+    box-shadow: 0 6px 18px rgba(0,212,184,.3);
+  }
+
+  .controls {
+    margin-top: 18px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 18px;
+    display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 14px 18px;
+    align-items: end;
+  }
+  .ctl label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 6px; }
+  .ctl .val { font-size: 14px; color: var(--text); font-variant-numeric: tabular-nums; }
+  .ctl input[type=range] { width: 100%; accent-color: var(--accent); }
+  .ctl select {
+    width: 100%;
+    background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 10px; font-size: 14px;
+    text-overflow: ellipsis;
+  }
+  .ctl .num {
+    background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 1px 6px; font-size: 13px; width: 70px;
+    font-variant-numeric: tabular-nums;
+    margin-left: 4px;
+    -moz-appearance: textfield;
+  }
+  .ctl .num::-webkit-outer-spin-button,
+  .ctl .num::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+  .grid {
+    margin-top: 18px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+  }
+  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } .controls { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 480px) { .controls { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 14px; overflow: hidden; display: flex; flex-direction: column;
+  }
+  .card h3 { margin: 0; padding: 14px 16px; font-size: 14px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .card h3 .tag { font-size: 11px; color: var(--text-dim); font-weight: 500; }
+  .preview {
+    background: repeating-conic-gradient(#1a1d2c 0% 25%, #14172380 0% 50%) 50% / 16px 16px;
+    min-height: 240px;
+    display: grid; place-items: center; padding: 10px;
+  }
+  .preview img {
+    max-width: 100%; max-height: 360px;
+    border-radius: 6px;
+    box-shadow: 0 6px 18px rgba(0,0,0,.4);
+  }
+  .preview .empty { color: var(--text-dim); font-size: 13px; padding: 24px; text-align: center; }
+  .meta {
+    padding: 12px 16px; font-size: 13px; color: var(--text-dim);
+    display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px;
+    border-top: 1px solid var(--border);
+  }
+  .meta b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .meta .full { grid-column: 1 / -1; }
+
+  .status {
+    margin-top: 16px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: var(--panel-2); border: 1px solid var(--border);
+    font-size: 13px; color: var(--text-dim);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .status.ok { border-color: rgba(74,222,128,.4); color: var(--ok); }
+  .status.warn { border-color: rgba(255,179,71,.4); color: var(--warn); }
+  .status.err { border-color: rgba(255,85,119,.4); color: var(--danger); }
+  .spinner {
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,.25); border-top-color: var(--accent);
+    animation: spin .7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+
+  footer { color: var(--text-dim); font-size: 12px; text-align: center; margin-top: 30px; }
+  footer code { background: var(--panel-2); padding: 1px 6px; border-radius: 5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo"><img src="favicon-192.png" alt="logo"></div>
+    <div>
+      <h1>Image Squeezer</h1>
+      <div class="sub">画像を <b>10MB以下</b> に自動圧縮 / リサイズ。ブラウザ内で完結、サーバ送信なし。</div>
+    </div>
+  </header>
+
+  <label class="drop" id="drop">
+    <input type="file" id="file" accept="image/*">
+    <p class="big">📁 ここに画像をドロップ / クリックで選択</p>
+    <p class="small">JPEG / PNG / WebP 対応 · 入力サイズ制限なし · 出力は自動で目標サイズ以下に</p>
+  </label>
+
+  <div class="controls">
+    <div class="ctl">
+      <label>目標サイズ <span class="val" id="targetVal">9.9 MB</span></label>
+      <input type="range" id="target" min="0.1" max="20" step="0.1" value="9.9">
+    </div>
+    <div class="ctl">
+      <label>最大寸法 (長辺px) <input type="number" id="maxDimNum" class="num" min="1" max="16384" value="1024"></label>
+      <input type="range" id="maxDim" min="0" max="24" step="1" value="12">
+    </div>
+    <div class="ctl">
+      <label>出力フォーマット</label>
+      <select id="format">
+        <option value="auto">自動 (透過はPNG)</option>
+        <option value="image/jpeg">JPEG</option>
+        <option value="image/webp">WebP</option>
+        <option value="image/png">PNG (リサイズのみ)</option>
+      </select>
+    </div>
+    <div class="ctl">
+      <button class="btn" id="run" disabled>圧縮する</button>
+    </div>
+  </div>
+
+  <div class="status" id="status"><span>画像を選択するとここに状況が出る。</span></div>
+
+  <div class="grid">
+    <div class="card">
+      <h3>元画像 <span class="tag" id="origTag">—</span></h3>
+      <div class="preview" id="origPrev"><div class="empty">まだ画像が読み込まれていない</div></div>
+      <div class="meta">
+        <div>ファイル名 <b id="origName">—</b></div>
+        <div>サイズ <b id="origSize">—</b></div>
+        <div>寸法 <b id="origDim">—</b></div>
+        <div>形式 <b id="origType">—</b></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>圧縮後 <span class="tag" id="outTag">—</span></h3>
+      <div class="preview" id="outPrev"><div class="empty">圧縮するとここにプレビュー</div></div>
+      <div class="meta">
+        <div>ファイル名 <b id="outName">—</b></div>
+        <div>サイズ <b id="outSize">—</b></div>
+        <div>寸法 <b id="outDim">—</b></div>
+        <div>削減率 <b id="outRatio">—</b></div>
+        <div class="full">使用品質 <b id="outQuality">—</b></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn ok" id="download" disabled>⬇ ダウンロード</button>
+    <button class="btn ghost" id="reset">リセット</button>
+  </div>
+
+  <footer>© Image Squeezer · 入力画像はブラウザ内のみで処理 · 二分探索で目標サイズに収束</footer>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const drop = $('drop'), fileInput = $('file');
+  const target = $('target'), maxDim = $('maxDim'), maxDimNum = $('maxDimNum'), format = $('format');
+  const targetVal = $('targetVal');
+  const SIZES = [64, 96, 128, 192, 256, 320, 480, 512, 640, 720, 768, 1024, 1080, 1280, 1440, 1600, 1920, 2048, 2160, 2560, 3840, 4096, 5120, 7680, 8192];
+  const status = $('status');
+  const runBtn = $('run'), downloadBtn = $('download'), resetBtn = $('reset');
+
+  let original = null;
+  let originalBitmap = null;
+  let result = null;
+
+  const fmtBytes = b => {
+    if (b == null) return '—';
+    if (b < 1024) return b + ' B';
+    if (b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
+    return (b/1024/1024).toFixed(2) + ' MB';
+  };
+
+  function setStatus(msg, cls='') {
+    status.className = 'status' + (cls ? ' ' + cls : '');
+    status.innerHTML = cls === '' && msg.startsWith('処理中')
+      ? `<span class="spinner"></span><span>${msg}</span>`
+      : `<span>${msg}</span>`;
+  }
+
+  target.addEventListener('input', () => { targetVal.textContent = parseFloat(target.value).toFixed(1) + ' MB'; });
+
+  const nearestSizeIndex = v => {
+    let best = 0;
+    for (let i = 1; i < SIZES.length; i++) {
+      if (Math.abs(SIZES[i] - v) < Math.abs(SIZES[best] - v)) best = i;
+    }
+    return best;
+  };
+  maxDim.addEventListener('input', () => {
+    maxDimNum.value = SIZES[parseInt(maxDim.value, 10)];
+  });
+  maxDimNum.addEventListener('input', () => {
+    const v = parseInt(maxDimNum.value, 10);
+    if (Number.isFinite(v) && v > 0) maxDim.value = nearestSizeIndex(v);
+  });
+  maxDimNum.addEventListener('change', () => {
+    let v = parseInt(maxDimNum.value, 10);
+    if (!Number.isFinite(v) || v < 1) v = 1;
+    if (v > 16384) v = 16384;
+    maxDimNum.value = v;
+    maxDim.value = nearestSizeIndex(v);
+  });
+
+  ['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => {
+    e.preventDefault(); drop.classList.add('hover');
+  }));
+  ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => {
+    e.preventDefault(); drop.classList.remove('hover');
+  }));
+  drop.addEventListener('drop', e => {
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) handleFile(f);
+  });
+  fileInput.addEventListener('change', e => {
+    const f = e.target.files && e.target.files[0];
+    if (f) handleFile(f);
+  });
+
+  async function handleFile(file) {
+    if (!file.type.startsWith('image/')) {
+      setStatus('画像ファイルを選んでくれ: ' + file.type, 'err');
+      return;
+    }
+    original = file;
+    result = null;
+    downloadBtn.disabled = true;
+    setStatus('読み込み中...', '');
+    try {
+      const bmp = await createImageBitmap(file);
+      originalBitmap = bmp;
+      $('origName').textContent = file.name;
+      $('origSize').textContent = fmtBytes(file.size);
+      $('origDim').textContent = `${bmp.width} × ${bmp.height}`;
+      $('origType').textContent = file.type || '(不明)';
+      $('origTag').textContent = fmtBytes(file.size);
+
+      // preview
+      const url = URL.createObjectURL(file);
+      $('origPrev').innerHTML = `<img src="${url}" alt="original">`;
+
+      // reset output
+      $('outPrev').innerHTML = '<div class="empty">圧縮するとここにプレビュー</div>';
+      $('outName').textContent = '—';
+      $('outSize').textContent = '—';
+      $('outDim').textContent = '—';
+      $('outRatio').textContent = '—';
+      $('outQuality').textContent = '—';
+      $('outTag').textContent = '—';
+
+      runBtn.disabled = false;
+      const targetBytes = parseFloat(target.value) * 1024 * 1024;
+      if (file.size <= targetBytes) {
+        setStatus(`元画像が既に目標以下 (${fmtBytes(file.size)} ≤ ${parseFloat(target.value).toFixed(1)} MB)。圧縮するか、そのまま使ってもOK`, 'warn');
+      } else {
+        setStatus('準備OK。「圧縮する」を押すかEnterで実行', 'ok');
+        // 自動で走らせちゃう
+        compress();
+      }
+    } catch (e) {
+      console.error(e);
+      setStatus('画像の読み込みに失敗: ' + e.message, 'err');
+    }
+  }
+
+  async function drawScaled(bmp, scale, mimeType, quality) {
+    const w = Math.max(1, Math.round(bmp.width * scale));
+    const h = Math.max(1, Math.round(bmp.height * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    if (mimeType === 'image/jpeg') {
+      // JPEG は透過を扱えないので白で塗りつぶす
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, w, h);
+    }
+    ctx.drawImage(bmp, 0, 0, w, h);
+    const blob = await new Promise(res => canvas.toBlob(res, mimeType, quality));
+    return { blob, w, h };
+  }
+
+  function detectOutputType(origType, choice) {
+    if (choice !== 'auto') return choice;
+    if (origType === 'image/png') return 'image/png';
+    if (origType === 'image/webp') return 'image/webp';
+    // gif, bmp, heic, jpeg 等は JPEG に寄せる
+    return 'image/jpeg';
+  }
+
+  async function compress() {
+    if (!originalBitmap) return;
+    runBtn.disabled = true;
+    downloadBtn.disabled = true;
+    const targetBytes = parseFloat(target.value) * 1024 * 1024;
+    const dimCap = Math.max(1, parseInt(maxDimNum.value, 10) || 1024);
+    const outType = detectOutputType(original.type, format.value);
+    const supportsQuality = (outType === 'image/jpeg' || outType === 'image/webp');
+
+    setStatus(`処理中: 目標 ${(targetBytes/1024/1024).toFixed(1)} MB 以下に収束させる...`, '');
+
+    try {
+      // 初期スケール: 長辺をdimCap以下に
+      const longSide = Math.max(originalBitmap.width, originalBitmap.height);
+      let baseScale = Math.min(1, dimCap / longSide);
+
+      let best = null;
+
+      if (supportsQuality) {
+        // 1. 品質を二分探索
+        let lo = 0.4, hi = 0.95, q = 0.85;
+        let scale = baseScale;
+        for (let i = 0; i < 9; i++) {
+          q = (lo + hi) / 2;
+          const r = await drawScaled(originalBitmap, scale, outType, q);
+          if (r.blob.size <= targetBytes) {
+            best = { ...r, quality: q, scale };
+            lo = q; // もう少し上げてみる
+          } else {
+            hi = q;
+          }
+          if (hi - lo < 0.02) break;
+        }
+        // 2. 品質下限でもダメなら、スケールも下げて再探索
+        if (!best) {
+          let scaleLo = 0.1, scaleHi = baseScale;
+          for (let i = 0; i < 8; i++) {
+            scale = (scaleLo + scaleHi) / 2;
+            const r = await drawScaled(originalBitmap, scale, outType, 0.82);
+            if (r.blob.size <= targetBytes) {
+              best = { ...r, quality: 0.82, scale };
+              scaleLo = scale;
+            } else {
+              scaleHi = scale;
+            }
+            if (scaleHi - scaleLo < 0.02) break;
+          }
+        }
+      } else {
+        // PNG: 品質効かないのでスケールで合わせる
+        let scaleLo = 0.05, scaleHi = baseScale;
+        // まずベースで試す
+        const first = await drawScaled(originalBitmap, baseScale, outType, undefined);
+        if (first.blob.size <= targetBytes) {
+          best = { ...first, quality: null, scale: baseScale };
+        } else {
+          for (let i = 0; i < 10; i++) {
+            const scale = (scaleLo + scaleHi) / 2;
+            const r = await drawScaled(originalBitmap, scale, outType, undefined);
+            if (r.blob.size <= targetBytes) {
+              best = { ...r, quality: null, scale };
+              scaleLo = scale;
+            } else {
+              scaleHi = scale;
+            }
+            if (scaleHi - scaleLo < 0.02) break;
+          }
+        }
+      }
+
+      if (!best) {
+        setStatus('目標サイズまで圧縮できなかった。最大寸法を下げるかフォーマットを変えてみてくれ', 'err');
+        runBtn.disabled = false;
+        return;
+      }
+
+      result = best;
+      const ext = outType.split('/')[1];
+      const baseName = (original.name.replace(/\.[^.]+$/, '') || 'image');
+      const outName = `${baseName}_squeezed.${ext === 'jpeg' ? 'jpg' : ext}`;
+
+      const url = URL.createObjectURL(best.blob);
+      $('outPrev').innerHTML = `<img src="${url}" alt="output">`;
+      $('outName').textContent = outName;
+      $('outSize').textContent = fmtBytes(best.blob.size);
+      $('outDim').textContent = `${best.w} × ${best.h}`;
+      const ratio = original.size ? (1 - best.blob.size / original.size) * 100 : 0;
+      $('outRatio').textContent = (ratio >= 0 ? '−' : '+') + Math.abs(ratio).toFixed(1) + '%';
+      $('outQuality').textContent = best.quality != null
+        ? `${(best.quality * 100).toFixed(0)}% · スケール ${(best.scale * 100).toFixed(1)}% · ${outType}`
+        : `(品質指定なし) スケール ${(best.scale * 100).toFixed(1)}% · ${outType}`;
+      $('outTag').textContent = fmtBytes(best.blob.size);
+
+      result.name = outName;
+      result.url = url;
+      downloadBtn.disabled = false;
+      runBtn.disabled = false;
+      setStatus(`完了。${fmtBytes(best.blob.size)} まで圧縮 (目標 ${(targetBytes/1024/1024).toFixed(1)} MB 以下)`, 'ok');
+    } catch (e) {
+      console.error(e);
+      setStatus('圧縮中にエラー: ' + e.message, 'err');
+      runBtn.disabled = false;
+    }
+  }
+
+  runBtn.addEventListener('click', compress);
+  downloadBtn.addEventListener('click', () => {
+    if (!result) return;
+    const a = document.createElement('a');
+    a.href = result.url;
+    a.download = result.name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  });
+  resetBtn.addEventListener('click', () => {
+    original = null; originalBitmap = null; result = null;
+    fileInput.value = '';
+    $('origPrev').innerHTML = '<div class="empty">まだ画像が読み込まれていない</div>';
+    $('outPrev').innerHTML = '<div class="empty">圧縮するとここにプレビュー</div>';
+    ['origName','origSize','origDim','origType','outName','outSize','outDim','outRatio','outQuality'].forEach(id => $(id).textContent = '—');
+    $('origTag').textContent = '—'; $('outTag').textContent = '—';
+    runBtn.disabled = true; downloadBtn.disabled = true;
+    setStatus('画像を選択するとここに状況が出る。');
+  });
+
+  // 初期化
+  targetVal.textContent = parseFloat(target.value).toFixed(1) + ' MB';
+  maxDim.value = nearestSizeIndex(parseInt(maxDimNum.value, 10) || 1024);
+})();
+</script>
+</body>
+</html>

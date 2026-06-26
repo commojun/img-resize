@@ -1,0 +1,14 @@
+# macOS
+.DS_Store
+
+# Playwright test artifacts
+.playwright-mcp/
+
+# Test screenshots at repo root
+/*.png
+
+# Build artifacts
+dist/bundle.zip
+
+# Intermediate / backup files
+dist/icon-orig-100.png
